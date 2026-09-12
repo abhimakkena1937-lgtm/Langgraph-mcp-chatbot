@@ -1,0 +1,14 @@
+faiss-cpu
+langchain
+langchain-community
+langchain-core
+langchain-google-genai
+langchain-mcp-adapters
+langchain-text-splitters
+langgraph
+langgraph-checkpoint-postgres
+psycopg[binary]
+pydantic
+pypdf
+python-dotenv
+streamlit
