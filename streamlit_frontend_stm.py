@@ -63,7 +63,7 @@ if document_metadata:
 
 st.sidebar.header("My Conversations")
 
-for thread_id in reversed(st.session_state["chat_threads"]):
+for thread_id in st.session_state["chat_threads"]:
     thread_id=str(thread_id)
     chat_name=get_chat_name(thread_id)
     if st.sidebar.button(chat_name,key=f"thread_{thread_id}"):
