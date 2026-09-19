@@ -1,0 +1,2 @@
+[deploy]
+startCommand = "streamlit run streamlit_frontend_stm.py --server.address 0.0.0.0 --server.port $PORT"
