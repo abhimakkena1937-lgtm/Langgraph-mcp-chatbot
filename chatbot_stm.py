@@ -40,6 +40,7 @@ def count_context_tokens(messages):
 _ASYNC_LOOP=asyncio.SelectorEventLoop(selectors.SelectSelector())
 _ASYNC_THREAD=threading.Thread(
     target=_ASYNC_LOOP.run_forever,
+    
     daemon=True
 )
 _ASYNC_THREAD.start()
@@ -612,7 +613,8 @@ tool_node=ToolNode(tools)
 # POSTGRES CHECKPOINTER
 
 
-POSTGRES_URL=(
+POSTGRES_URL = os.getenv(
+    "DATABASE_URL",
     "postgresql://postgres:postgres@localhost:5442/postgres"
 )
 
