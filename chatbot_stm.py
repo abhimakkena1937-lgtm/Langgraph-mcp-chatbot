@@ -206,47 +206,52 @@ def rag_tool(
 # MCP SERVERS
 # ============================================================
 
+
+import os
+
+IS_RAILWAY = os.getenv("DEPLOYMENT_ENV") == "railway"
 HORIZON_API_KEY=os.getenv("HORIZON_API_KEY")
 
-SERVERS={
-    "Text Utility Server":{
-        "transport":"stdio",
-        "command":r"C:\Users\abhim\.local\bin\uv.exe",
-        "args":[
-            "run",
-            "--directory",
-            r"C:\Users\abhim\AppData\Roaming\Claude\demo_local_server",
-            "fastmcp",
-            "run",
-            r"C:\Users\abhim\AppData\Roaming\Claude\demo_local_server\main.py"
-        ]
-    },
+SERVERS = {}
 
-    "Utility Server":{
-        "transport":"stdio",
-        "command":r"C:\Users\abhim\.local\bin\uv.exe",
-        "args":[
-            "run",
-            "--directory",
-            r"C:\fast_mcp_demo_server",
-            "fastmcp",
-            "run",
-            r"C:\fast_mcp_demo_server\demo.py"
-        ]
-    },
-
-    "manim-server":{
-        "transport":"stdio",
-        "command":r"C:\Users\abhim\manim-project\.venv\Scripts\python.exe",
-        "args":[
-            r"C:\Users\abhim\manim-project\manim-mcp-server\src\manim_server.py"
-        ],
-        "env":{
-            "MANIM_EXECUTABLE":
-                r"C:\Users\abhim\manim-project\.venv\Scripts\manim.exe"
+if not IS_RAILWAY:
+    SERVERS = {
+        "Text Utility Server": {
+            "transport": "stdio",
+            "command": r"C:\Users\abhim\.local\bin\uv.exe",
+            "args": [
+                "run",
+                "--directory",
+                r"C:\Users\abhim\AppData\Roaming\Claude\demo_local_server",
+                "fastmcp",
+                "run",
+                r"C:\Users\abhim\AppData\Roaming\Claude\demo_local_server\main.py"
+            ]
+        },
+        "Utility Server": {
+            "transport": "stdio",
+            "command": r"C:\Users\abhim\.local\bin\uv.exe",
+            "args": [
+                "run",
+                "--directory",
+                r"C:\fast_mcp_demo_server",
+                "fastmcp",
+                "run",
+                r"C:\fast_mcp_demo_server\demo.py"
+            ]
+        },
+        "manim-server": {
+            "transport": "stdio",
+            "command": r"C:\Users\abhim\manim-project\.venv\Scripts\python.exe",
+            "args": [
+                r"C:\Users\abhim\manim-project\manim-mcp-server\src\manim_server.py"
+            ],
+            "env": {
+                "MANIM_EXECUTABLE":
+                    r"C:\Users\abhim\manim-project\.venv\Scripts\manim.exe"
+            }
         }
     }
-}
 
 if HORIZON_API_KEY:
     SERVERS["Expense Tracker"]={
