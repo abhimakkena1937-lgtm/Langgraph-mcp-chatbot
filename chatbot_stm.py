@@ -1,4 +1,5 @@
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+import psycopg
 import os,threading,requests,selectors,asyncio,tempfile
 from typing import TypedDict,Annotated,Any,Optional,List
 from dotenv import load_dotenv
@@ -623,6 +624,122 @@ POSTGRES_URL = os.getenv(
     "postgresql://postgres:postgres@localhost:5442/postgres"
 )
 
+
+# ============================================================
+# USER / THREAD OWNERSHIP
+# ============================================================
+
+def register_thread(user_id: str, thread_id: str):
+    """Register a LangGraph thread as belonging to a user."""
+
+    if not user_id or not thread_id:
+        return
+
+    with psycopg.connect(POSTGRES_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO user_threads (
+                    user_id,
+                    thread_id
+                )
+                VALUES (%s, %s)
+                ON CONFLICT (thread_id) DO NOTHING
+                """,
+                (str(user_id), str(thread_id))
+            )
+        conn.commit()
+
+
+def retrieve_all_threads(user_id: str):
+    """Return only threads owned by the authenticated user."""
+
+    if not user_id:
+        return []
+
+    with psycopg.connect(POSTGRES_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT thread_id
+                FROM user_threads
+                WHERE user_id = %s
+                ORDER BY created_at DESC
+                """,
+                (str(user_id),)
+            )
+            rows = cur.fetchall()
+
+    return [str(row[0]) for row in rows]
+
+
+def user_owns_thread(user_id: str, thread_id: str) -> bool:
+    """Check whether a thread belongs to the authenticated user."""
+
+    if not user_id or not thread_id:
+        return False
+
+    with psycopg.connect(POSTGRES_URL) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT 1
+                FROM user_threads
+                WHERE user_id = %s
+                  AND thread_id = %s
+                LIMIT 1
+                """,
+                (str(user_id), str(thread_id))
+            )
+            return cur.fetchone() is not None
+
+
+async def _backfill_thread_ownership(checkpointer):
+    """Backfill existing checkpoints into user_threads when user_id was stored."""
+
+    pairs = set()
+
+    async for checkpoint in checkpointer.alist(None):
+        configurable = checkpoint.config.get(
+            "configurable",
+            {}
+        )
+
+        thread_id = configurable.get(
+            "thread_id"
+        )
+
+        user_id = configurable.get(
+            "user_id"
+        )
+
+        if thread_id and user_id:
+            pairs.add((str(user_id), str(thread_id)))
+
+    if not pairs:
+        print("THREAD BACKFILL: no user/thread pairs found")
+        return
+
+    with psycopg.connect(POSTGRES_URL) as conn:
+        with conn.cursor() as cur:
+            cur.executemany(
+                """
+                INSERT INTO user_threads (
+                    user_id,
+                    thread_id
+                )
+                VALUES (%s, %s)
+                ON CONFLICT (thread_id) DO NOTHING
+                """,
+                list(pairs)
+            )
+        conn.commit()
+
+    print(
+        f"THREAD BACKFILL: processed {len(pairs)} user/thread pairs"
+    )
+
+
 async def init_checkpointer():
 
     checkpointer_cm=AsyncPostgresSaver.from_conn_string(
@@ -639,6 +756,11 @@ checkpointer,checkpointer_cm=run_async(
     init_checkpointer()
 )
 
+# Backfill existing LangGraph threads into the ownership table.
+# This only works for checkpoints that already contain user_id.
+run_async(
+    _backfill_thread_ownership(checkpointer)
+)
 
 memory_store_cm = PostgresStore.from_conn_string(POSTGRES_URL)
 memory_store = memory_store_cm.__enter__()
@@ -716,29 +838,9 @@ chatbot=graph.compile(
 
 # THREADS
 
-
-async def _alist_threads():
-
-    all_threads=[]
-    seen_threads=set()
-
-    async for checkpoint in checkpointer.alist(None):
-
-        thread_id=(
-            checkpoint.config
-            .get("configurable",{})
-            .get("thread_id")
-        )
-
-        if thread_id and thread_id not in seen_threads:
-
-            seen_threads.add(thread_id)
-            all_threads.append(thread_id)
-
-    return all_threads
-
-def retrieve_all_threads():
-    return run_async(_alist_threads())
+# Thread ownership is stored in the user_threads table.
+# Do not enumerate every LangGraph checkpoint here because
+# checkpoint ownership is not a reliable authorization boundary.
 
 
 # DOCUMENT METADATA
